@@ -119,10 +119,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export SELECTION_REPORT="${GITHUB_WORKSPACE}/artifact/selection-report.json"
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
-          p = Path("${GITHUB_WORKSPACE}/artifact/selection-report.json")
+          p = Path(os.environ["SELECTION_REPORT"])
           obj = json.loads(p.read_text())
           sel = obj["selected"]
           print(f"Selected variant: {sel['name']}")
