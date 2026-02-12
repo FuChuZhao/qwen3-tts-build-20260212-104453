@@ -21,6 +21,36 @@ on:
         required: false
         default: "true"
         type: string
+      threads_grid:
+        description: "Benchmark threads grid, e.g. 1,2,4"
+        required: false
+        default: "1,2,4"
+        type: string
+      graph_grid:
+        description: "ORT graph optimization grid"
+        required: false
+        default: "extended,all"
+        type: string
+      quant_variants:
+        description: "Quant variants spec: name:weight_type:per_channel;..."
+        required: false
+        default: "int8_qint8_pc:qint8:true;int8_qint8_pt:qint8:false;int8_quint8_pc:quint8:true"
+        type: string
+      latency_weight:
+        description: "Selection weight for latency"
+        required: false
+        default: "0.65"
+        type: string
+      size_weight:
+        description: "Selection weight for model size"
+        required: false
+        default: "0.30"
+        type: string
+      error_weight:
+        description: "Selection weight for error"
+        required: false
+        default: "0.05"
+        type: string
 
 permissions:
   contents: read
@@ -34,6 +64,12 @@ jobs:
       SOURCE_REF: ${{ inputs.source_ref }}
       BUILD_MODE: ${{ inputs.mode }}
       USE_MOCK_MODEL: ${{ inputs.use_mock_model }}
+      THREADS_GRID: ${{ inputs.threads_grid }}
+      GRAPH_GRID: ${{ inputs.graph_grid }}
+      QUANT_VARIANTS: ${{ inputs.quant_variants }}
+      LATENCY_WEIGHT: ${{ inputs.latency_weight }}
+      SIZE_WEIGHT: ${{ inputs.size_weight }}
+      ERROR_WEIGHT: ${{ inputs.error_weight }}
     steps:
       - name: Checkout public build repo
         uses: actions/checkout@v4
@@ -90,6 +126,12 @@ jobs:
             --use-mock-model "${USE_MOCK_MODEL}" \
             --onnx-device "cpu" \
             --onnx-dtype "float32" \
+            --threads-grid "${THREADS_GRID}" \
+            --graph-grid "${GRAPH_GRID}" \
+            --quant-variants "${QUANT_VARIANTS}" \
+            --latency-weight "${LATENCY_WEIGHT}" \
+            --size-weight "${SIZE_WEIGHT}" \
+            --error-weight "${ERROR_WEIGHT}" \
             --artifact-dir "${GITHUB_WORKSPACE}/artifact"
 
       - name: Compare Torch vs ONNX
@@ -132,6 +174,11 @@ jobs:
           print(f"Latency(sum mean ms): {sel['latency_ms']:.4f}")
           print(f"Size(bytes): {sel['size_bytes']:.0f}")
           print(f"Error penalty: {sel['error_penalty']:.6f}")
+          ranked = obj.get("ranked", [])
+          print(f"Candidates: {len(ranked)}")
+          if len(ranked) > 1:
+              second = ranked[1]
+              print(f"Second best: {second['name']} (score={second['score']:.6f})")
           PY
 
       - name: Upload artifact (minimum retention)
