@@ -14,7 +14,7 @@ on:
       mode:
         description: "Build mode passed to private build script"
         required: false
-        default: "onnx_export"
+        default: "optimize_full"
         type: string
       use_mock_model:
         description: "Use mock model for fast CI"
@@ -113,6 +113,24 @@ jobs:
           set -euo pipefail
           cd source
           python scripts/smoke_qwen3_tts_onnx.py --artifact-dir "${GITHUB_WORKSPACE}/artifact"
+
+      - name: Summarize optimization selection
+        if: ${{ inputs.mode == 'optimize_full' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+import json
+from pathlib import Path
+p = Path("${GITHUB_WORKSPACE}/artifact/selection-report.json")
+obj = json.loads(p.read_text())
+sel = obj["selected"]
+print(f"Selected variant: {sel['name']}")
+print(f"Score: {sel['score']:.6f}")
+print(f"Latency(sum mean ms): {sel['latency_ms']:.4f}")
+print(f"Size(bytes): {sel['size_bytes']:.0f}")
+print(f"Error penalty: {sel['error_penalty']:.6f}")
+PY
 
       - name: Upload artifact (minimum retention)
         uses: actions/upload-artifact@v4
