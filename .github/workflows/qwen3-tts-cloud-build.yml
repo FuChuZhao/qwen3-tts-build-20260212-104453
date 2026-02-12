@@ -120,17 +120,17 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-import json
-from pathlib import Path
-p = Path("${GITHUB_WORKSPACE}/artifact/selection-report.json")
-obj = json.loads(p.read_text())
-sel = obj["selected"]
-print(f"Selected variant: {sel['name']}")
-print(f"Score: {sel['score']:.6f}")
-print(f"Latency(sum mean ms): {sel['latency_ms']:.4f}")
-print(f"Size(bytes): {sel['size_bytes']:.0f}")
-print(f"Error penalty: {sel['error_penalty']:.6f}")
-PY
+          import json
+          from pathlib import Path
+          p = Path("${GITHUB_WORKSPACE}/artifact/selection-report.json")
+          obj = json.loads(p.read_text())
+          sel = obj["selected"]
+          print(f"Selected variant: {sel['name']}")
+          print(f"Score: {sel['score']:.6f}")
+          print(f"Latency(sum mean ms): {sel['latency_ms']:.4f}")
+          print(f"Size(bytes): {sel['size_bytes']:.0f}")
+          print(f"Error penalty: {sel['error_penalty']:.6f}")
+          PY
 
       - name: Upload artifact (minimum retention)
         uses: actions/upload-artifact@v4
