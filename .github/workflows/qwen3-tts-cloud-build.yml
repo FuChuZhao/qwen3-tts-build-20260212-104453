@@ -39,17 +39,17 @@ on:
       latency_weight:
         description: "Selection weight for latency"
         required: false
-        default: "0.65"
+        default: "0.55"
         type: string
       size_weight:
         description: "Selection weight for model size"
         required: false
-        default: "0.30"
+        default: "0.25"
         type: string
       error_weight:
         description: "Selection weight for error"
         required: false
-        default: "0.05"
+        default: "0.20"
         type: string
 
 permissions:
@@ -70,9 +70,19 @@ jobs:
       LATENCY_WEIGHT: ${{ inputs.latency_weight }}
       SIZE_WEIGHT: ${{ inputs.size_weight }}
       ERROR_WEIGHT: ${{ inputs.error_weight }}
+      PIP_NO_CACHE_DIR: "1"
     steps:
       - name: Checkout public build repo
         uses: actions/checkout@v4
+
+      - name: Free disk space for large ONNX jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/.ghcup || true
+          sudo docker system prune -af || true
+          df -h
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -83,16 +93,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          pip install onnx onnxruntime onnxscript
-          pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --upgrade pip --no-cache-dir
+          pip install --no-cache-dir onnx onnxruntime onnxscript
+          pip install --no-cache-dir torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install qwen-tts runtime (real model mode)
         if: ${{ inputs.use_mock_model == 'false' }}
         shell: bash
         run: |
           set -euo pipefail
-          pip install -U qwen-tts
+          pip install --no-cache-dir -U qwen-tts
 
       - name: Setup SSH key for SOURCE_REPO
         shell: bash
