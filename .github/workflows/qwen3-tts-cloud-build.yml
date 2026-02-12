@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install onnx onnxruntime
+          pip install onnx onnxruntime onnxscript
           pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Setup SSH key for SOURCE_REPO
