@@ -51,6 +51,11 @@ on:
         required: false
         default: "0.20"
         type: string
+      upload_artifact:
+        description: "Whether to upload artifact"
+        required: false
+        default: "true"
+        type: string
 
 permissions:
   contents: read
@@ -192,6 +197,7 @@ jobs:
           PY
 
       - name: Upload artifact (minimum retention)
+        if: ${{ inputs.upload_artifact == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
