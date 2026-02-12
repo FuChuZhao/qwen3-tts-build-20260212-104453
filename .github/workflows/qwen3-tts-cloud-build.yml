@@ -1,0 +1,116 @@
+name: qwen3-tts-cloud-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Private SOURCE_REPO ref/commit to build"
+        required: true
+        type: string
+      artifact_name:
+        description: "Artifact name to upload"
+        required: true
+        type: string
+      mode:
+        description: "Build mode passed to private build script"
+        required: false
+        default: "onnx_export"
+        type: string
+      use_mock_model:
+        description: "Use mock model for fast CI"
+        required: false
+        default: "true"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPO: FuChuZhao/qwen3-tts-source-20260212-104453
+      ARTIFACT_NAME: ${{ inputs.artifact_name }}
+      SOURCE_REF: ${{ inputs.source_ref }}
+      BUILD_MODE: ${{ inputs.mode }}
+      USE_MOCK_MODEL: ${{ inputs.use_mock_model }}
+    steps:
+      - name: Checkout public build repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install onnx onnxruntime torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Setup SSH key for SOURCE_REPO
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          cat > ~/.ssh/id_ed25519 <<'EOF'
+          ${{ secrets.SOURCE_REPO_SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Clone private SOURCE_REPO
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone "git@github.com:${SOURCE_REPO}.git" source
+          cd source
+          git fetch --all --tags --prune
+          git checkout "${SOURCE_REF}"
+
+      - name: Run private build entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          chmod +x tool/ci/build.sh
+          tool/ci/build.sh \
+            --mode "${BUILD_MODE}" \
+            --use-mock-model "${USE_MOCK_MODEL}" \
+            --onnx-device "cpu" \
+            --onnx-dtype "float32" \
+            --artifact-dir "${GITHUB_WORKSPACE}/artifact"
+
+      - name: Compare Torch vs ONNX
+        if: ${{ inputs.mode == 'onnx_export' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          python scripts/compare_torch_onnx.py \
+            --model-id Qwen/Qwen3-TTS-12Hz-0.6B-Base \
+            --onnx-dir "${GITHUB_WORKSPACE}/artifact/onnx" \
+            --output-json "${GITHUB_WORKSPACE}/artifact/compare-report.json" \
+            --device cpu \
+            --dtype float32 \
+            --use-mock-model "${USE_MOCK_MODEL}"
+
+      - name: ONNX smoke test
+        if: ${{ inputs.mode == 'onnx_export' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          python scripts/smoke_qwen3_tts_onnx.py --artifact-dir "${GITHUB_WORKSPACE}/artifact"
+
+      - name: Upload artifact (minimum retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: artifact
+          retention-days: 1
+          if-no-files-found: error
+
