@@ -51,6 +51,13 @@ jobs:
           pip install onnx onnxruntime onnxscript
           pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
+      - name: Install qwen-tts runtime (real model mode)
+        if: ${{ inputs.use_mock_model == 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install -U qwen-tts
+
       - name: Setup SSH key for SOURCE_REPO
         shell: bash
         run: |
