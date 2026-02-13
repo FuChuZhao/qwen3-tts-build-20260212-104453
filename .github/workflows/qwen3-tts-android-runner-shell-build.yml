@@ -30,7 +30,7 @@ jobs:
   build_android_shell:
     runs-on: ubuntu-latest
     env:
-      SOURCE_REPO: your-org/your-private-source-repo
+      SOURCE_REPO: FuChuZhao/qwen3-tts-source-20260212-104453
       SOURCE_REF: ${{ inputs.source_ref }}
       ARTIFACT_NAME: ${{ inputs.artifact_name }}
       BUILD_VARIANT: ${{ inputs.build_variant }}
@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null
+          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Setup SSH key for SOURCE_REPO
