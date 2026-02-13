@@ -1,0 +1,106 @@
+name: qwen3-tts-android-runner-shell-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Private SOURCE_REPO ref/commit to build"
+        required: true
+        type: string
+      artifact_name:
+        description: "Artifact name to upload"
+        required: true
+        default: "qwen3tts-android-runner-shell"
+        type: string
+      build_variant:
+        description: "APK variant: debug or release"
+        required: false
+        default: "debug"
+        type: string
+      upload_artifact:
+        description: "Whether to upload artifact"
+        required: false
+        default: "true"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build_android_shell:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPO: your-org/your-private-source-repo
+      SOURCE_REF: ${{ inputs.source_ref }}
+      ARTIFACT_NAME: ${{ inputs.artifact_name }}
+      BUILD_VARIANT: ${{ inputs.build_variant }}
+      PIP_NO_CACHE_DIR: "1"
+    steps:
+      - name: Checkout public build repo
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses and install components
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Setup SSH key for SOURCE_REPO
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          cat > ~/.ssh/id_ed25519 <<'EOF'
+          ${{ secrets.SOURCE_REPO_SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Clone private SOURCE_REPO
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone "git@github.com:${SOURCE_REPO}.git" source
+          cd source
+          git fetch --all --tags --prune
+          git checkout "${SOURCE_REF}"
+
+      - name: Build Android runner shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source/android/runner-shell
+
+          if [[ "${BUILD_VARIANT}" == "release" ]]; then
+            gradle --no-daemon :app:assembleRelease
+            apk_src="app/build/outputs/apk/release/app-release-unsigned.apk"
+          else
+            gradle --no-daemon :app:assembleDebug
+            apk_src="app/build/outputs/apk/debug/app-debug.apk"
+          fi
+
+          mkdir -p "${GITHUB_WORKSPACE}/artifact"
+          cp "${apk_src}" "${GITHUB_WORKSPACE}/artifact/qwen3tts-runner-shell.apk"
+
+      - name: Upload artifact (minimum retention)
+        if: ${{ inputs.upload_artifact == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: artifact
+          retention-days: 1
+          if-no-files-found: error
